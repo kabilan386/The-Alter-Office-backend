@@ -3,9 +3,10 @@ require('dotenv').config();
 const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
+var fs = require('fs');
 const app = express();
 const db = require('./db.js');
-const Image = require('./imageModal.js'); 
+const Image = require('./imageModal.js');
 app.use(cors())
 // Set storage engine
 const storage = multer.diskStorage({
@@ -43,6 +44,44 @@ function checkFileType(file, cb) {
 app.use('/images', express.static('uploads'));
 
 // Express route
+
+app.get('/get-image', async (req, res) => {
+    const allImages = await Image.find({});
+    res.json({
+        status: true,
+        images: allImages
+    })
+})
+app.get('/update-avatar/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const removeState = await Image.findOneAndUpdate({ dbState : true }, { dbState : false });
+        const findImage = await Image.findByIdAndUpdate({ _id: id }, { dbState : true });
+        if(findImage){
+            res.json({
+                status: true,
+                message: `Profile updated successfully`
+            });
+        }
+    } catch (error) {
+        
+    }
+})
+app.delete('/remove/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const findImage = await Image.findById({ _id: id });
+        fs.unlink(`./uploads/${findImage.url}`, async function () {
+            await Image.deleteOne({ _id: id })
+            res.json({
+                status: true,
+                message: `File removed successfully`
+            });
+        })
+    } catch (error) {
+        console.log("error")
+    }
+})
 app.post('/upload', (req, res) => {
     upload(req, res, async (err) => {
         if (err) {
@@ -63,7 +102,8 @@ app.post('/upload', (req, res) => {
             } else {
 
                 const newImage = new Image({
-                    url: req.file.filename
+                    url: req.file.filename,
+                    size: req.file.size
                 });
 
                 await newImage.save();

@@ -5,7 +5,8 @@ const imageSchema = new mongoose.Schema({
     dbState: {
         type : Boolean,
         default: false,
-    }
+    },
+    size : String
 });
 
 const Image = mongoose.model('Image', imageSchema);

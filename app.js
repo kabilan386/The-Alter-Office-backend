@@ -8,11 +8,12 @@ const app = express();
 const db = require('./db.js');
 const Image = require('./imageModal.js');
 app.use(cors())
+app.use(express.json())
 // Set storage engine
 const storage = multer.diskStorage({
     destination: './uploads/',
     filename: function (req, file, cb) {
-        cb(null, file.fieldname + '-' + Date.now() + path.extname(file.originalname));
+        cb(null, file.originalname + '-' + Date.now() + path.extname(file.originalname));
     }
 });
 
@@ -24,6 +25,8 @@ const upload = multer({
         checkFileType(file, cb);
     }
 }).single('file');
+
+const uploadCropped = multer({ storage: storage }).single("file");
 
 // Check file type
 function checkFileType(file, cb) {
@@ -52,11 +55,11 @@ app.get('/get-image', async (req, res) => {
         images: allImages
     })
 })
-app.get('/update-avatar/:id', async (req, res) => {
-    const { id } = req.params;
+app.put('/update-avatar', async (req, res) => {
+    const { imageid } = req.body;
     try {
-        const removeState = await Image.findOneAndUpdate({ dbState : true }, { dbState : false });
-        const findImage = await Image.findByIdAndUpdate({ _id: id }, { dbState : true });
+        await Image.findOneAndUpdate({ dbState : true }, { dbState : false });
+        const findImage = await Image.findByIdAndUpdate({ _id: imageid }, { dbState : true });
         if(findImage){
             res.json({
                 status: true,
@@ -64,7 +67,7 @@ app.get('/update-avatar/:id', async (req, res) => {
             });
         }
     } catch (error) {
-        
+        console.log("error",error)
     }
 })
 app.delete('/remove/:id', async (req, res) => {
@@ -82,6 +85,36 @@ app.delete('/remove/:id', async (req, res) => {
         console.log("error")
     }
 })
+app.post('/upload-crop', (req, res) => {
+    uploadCropped(req, res, async (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                res.json({
+                    status: false,
+                    message: "File size is too large! Maximum size is 5MB"
+                });
+            } else {
+                res.send(err);
+            }
+        } else {
+            if (req.file == undefined) {
+                res.json({
+                    status: false,
+                    message: 'Error: No File Selected!'
+                });
+            } else {
+
+                await Image.findOneAndUpdate({dbState : true }, { url: req.file.filename,
+                    size: req.file.size })
+
+                res.json({
+                    status: true,
+                    message: `Croped File Uploaded: ${req.file.filename}`
+                });
+            }
+        }
+    });
+});
 app.post('/upload', (req, res) => {
     upload(req, res, async (err) => {
         if (err) {
